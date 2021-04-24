@@ -2,6 +2,7 @@
 This repository exists only for demo and historical purposes, check [this link][poly-decomp] if you are looking for a working code. It is also may be a reinvention of the wheel. You've been warned.
 
 [Convex decomposition demo](https://raw.githack.com/danillissimo/SVGConvexDecompositon.js/main/polygonSimplifyTest.html)
+
 [Bézier curve approximation demo](https://raw.githack.com/danillissimo/SVGConvexDecompositon.js/main/bezierApproximationTest.html)
 ## Convex decomposition
 This is a cleaned-up version, still requiring a heavy refactor, of my student work, which took me approximately six months to develop from zero. The algorithm is pretty simple:
