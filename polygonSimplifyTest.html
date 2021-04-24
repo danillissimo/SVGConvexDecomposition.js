@@ -136,42 +136,6 @@
             await processor.process(vertices);
         }
 
-
-        /*
-        for (let p = 0; p < figures.length; p++) {
-            let path = document.getElementById('path' + figures[p]);
-
-            var parser = new CollisionSvgModelProcessor();
-            var processor = new CollisionModelProcessor(canvas);
-
-            var svgTextRef = { reference: path.getAttribute('d') };
-            console.log(svgTextRef);
-            var vertices = parser.parseCollisisonSVGModel(svgTextRef);
-            visualizeVertexOrder(vertices);
-            console.log(vertices);
-
-            if(false){
-                continue;
-            }
-
-            var model = processor.process(vertices);
-            console.log(model);
-
-            for (let i = 0; i < model.convexSegments.length; i++) {
-                let segment = document.createElementNS("http://www.w3.org/2000/svg", 'path');
-                segment.setAttribute('fill-opacity', 0.5);
-                segment.setAttribute('fill', randomColor());
-                let d = 'M' + model.vertices.cartesian[model.convexSegments[i][0]].x + ',' + model.vertices.cartesian[model.convexSegments[i][0]].y
-                for (let v = 1; v < model.convexSegments[i].length; v++) {
-                    d += 'L' + model.vertices.cartesian[model.convexSegments[i][v]].x + ',' + model.vertices.cartesian[model.convexSegments[i][v]].y;
-                }
-                d += 'Z';
-                segment.setAttribute('d', d);
-                canvas.appendChild(segment);
-            }
-            */
-    }
-
     //==============================================================================================
 
     function setSpeed() {
@@ -190,8 +154,4 @@
         speed.value = v;
     }
 </script>
-<!--
-    при определении перегибов, пара из первой и последней точек должна тестировать мануально, т.к. не может быть обработана циклом
--->
-
 </html>
