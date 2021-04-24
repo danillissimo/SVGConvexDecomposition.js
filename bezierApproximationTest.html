@@ -1,0 +1,287 @@
+<html>
+<head>
+    <script type="text/javascript" src='./script/vector.js'></script>
+    <script type="text/javascript" src="./script/bezier.js"></script>
+    <script type="text/javascript" src='./script/polarCoords.js'></script>
+    <script type="text/javascript" src='./script/quadraticEquation.js'></script>
+    <script type="text/javascript" src='./script/collisionSVGModelProcessor.js'></script>
+</head>
+
+<body onload="init()">
+    <svg id='canvas0'>
+        <rect x='0' y='0' width='4000' height='4000' fill='grey' />
+        <path fill='transparent' stroke='blue' stroke-width='1' id='broken' />
+        <path fill='transparent' stroke='yellow' stroke-width='1' id='splitter0' />
+        <path fill='transparent' stroke='yellow' stroke-width='1' id='splitter1' />
+        <circle stroke='#00ff00' stroke-width='1' id='quarterMarker' r='2' />
+        <circle stroke='#00ff00' stroke-width='1' id='threeQuarterMarker' r='2' />
+        <circle fill='yellow' stroke='#00ff00' stroke-width='1' id='projectionMarker0' r='3' />
+        <circle fill='yellow' stroke='#00ff00' stroke-width='1' id='projectionMarker1' r='3' />
+        <path fill='transparent' stroke='black' stroke-width='1' id='approximator' />
+        <circle stroke='#00ff00' stroke-width='1' id='centerMarker' r='5' />
+        <path fill='transparent' stroke='red' stroke-width='1' id='bezier' />
+        <circle fill='red' id='markerA' r='5' onmousedown="onVertexMouseDown(event);" />
+        <circle fill='red' id='markerB' r='5' onmousedown="onVertexMouseDown(event);" />
+        <circle fill='red' id='markerC' r='5' onmousedown="onVertexMouseDown(event);" />
+        <circle fill='red' id='markerD' r='5' onmousedown="onVertexMouseDown(event);" />
+    </svg>
+    <svg id='canvas1'>
+        <rect x='0' y='0' width='4000' height='4000' fill='lightgrey' />
+    </svg>
+    <svg id='canvas2'>
+        <rect x='0' y='0' width='4000' height='4000' fill='#21b9ff' />
+        <path id='object' fill="#8aff3c" stroke="#f08808" stroke-width="0.264583px"
+        d="M 29.1 76.376 C 91.39 141.498 268.337 214.325 210.347 153.701 C 109.444 88.67 425.265 -28.841 512.934 27.664 C 628.881 115.288 540.943 320.282 357.361 181.535 C 287.386 373.844 485.533 363.831 518.379 273.553 C 624.747 401.761 523.199 515.993 467.04 448.304 C 398.637 658.034 159.625 490.189 238.347 248.811 C 233.195 125.877 141.027 213.512 152.005 475.368 C 144.999 740.702 22.128 405.379 20.545 401.913 C 30.748 401.913 -63.262 244.73 158.225 203.189 C 46.113 193.353 15.023 75.143 29.1 76.376 Z"
+        />
+    </svg>
+    <br>
+    Max angle deviation:<input type="number" value="3" id='angle' oninput="rebuildOutput();rebuildObject();">
+    <br>
+    Clean approximated curve canvas on update:<input type="checkbox" checked=true id='cleanCanvasFlag' oninput="rebuildOutput()">
+    <br>
+    Marker coordinates:
+    <br>
+    <input type="number" value="200" id='ax' oninput="rebuildOutput()">
+    <input type="number" value="200" id='ay' oninput="rebuildOutput()">
+    <br>
+    <input type="number" value="100" id='bx' oninput="rebuildOutput()">
+    <input type="number" value="100" id='by' oninput="rebuildOutput()">
+    <br>
+    <input type="number" value="400" id='cx' oninput="rebuildOutput()">
+    <input type="number" value="400" id='cy' oninput="rebuildOutput()">
+    <br>
+    <input type="number" value="300" id='dx' oninput="rebuildOutput()">
+    <input type="number" value="300" id='dy' oninput="rebuildOutput()">
+    <br>
+    <br>
+    <div style="color: red; font-weight: bold;">Red markers in the first viewport are draggable</div>
+    The initial configuration of the curve is the test of approximation of a folded line<br>
+    Green-black points marks the quarters of the curve, yellow lines connects bounding points with the center of the curve<br>
+    The yellow-green point and black lines are a mystery for me now<br>
+</body>
+<script type="text/javascript">
+    const SvgNS = "http://www.w3.org/2000/svg";
+    var viewportSize = 600;
+
+    var outputCanvas = document.getElementById('canvas1');
+    var objectCanvas = document.getElementById('canvas2');
+    var object = document.getElementById('object');
+    var approximatedObject = null;
+
+    var ax = document.getElementById('ax');
+    var bx = document.getElementById('bx');
+    var cx = document.getElementById('cx');
+    var dx = document.getElementById('dx');
+    var ay = document.getElementById('ay');
+    var by = document.getElementById('by');
+    var cy = document.getElementById('cy');
+    var dy = document.getElementById('dy');
+
+    var broken = document.getElementById('broken');
+    var bezier = document.getElementById('bezier');
+    var markerA = document.getElementById('markerA');
+    var markerB = document.getElementById('markerB');
+    var markerC = document.getElementById('markerC');
+    var markerD = document.getElementById('markerD');
+    var centerMarker = document.getElementById('centerMarker');
+    var quarterMarker = document.getElementById('quarterMarker');
+    var threeQuarterMarker = document.getElementById('threeQuarterMarker');
+    
+    var cleanCanvasFlag = document.getElementById('cleanCanvasFlag');
+    var angle = document.getElementById('angle');
+
+    function init() {
+        for (let i = 0; i < 3; i++) {
+            let canvas = document.getElementById('canvas' + i);
+            canvas.setAttribute('viewBox', '0 0 ' + viewportSize + ' ' + viewportSize);
+            canvas.setAttribute('width', viewportSize);
+            canvas.setAttribute('height', viewportSize);
+        }
+        rebuildOutput();
+        rebuildObject();
+    }
+
+    //==========================================================================================
+
+    function rebuildOutput() {
+        //Update input viewport==================
+        broken.setAttribute('d', 'M' + ax.value + ',' + ay.value + 'L' + bx.value + ',' + by.value + 'L' + cx.value + ',' + cy.value + 'L' + dx.value + ',' + dy.value);
+        bezier.setAttribute('d', 'M' + ax.value + ',' + ay.value + 'C' + bx.value + ',' + by.value + ' ' + cx.value + ',' + cy.value + ' ' + dx.value + ',' + dy.value);
+        
+        markerA.setAttribute('cx', ax.value);
+        markerA.setAttribute('cy', ay.value);
+
+        markerB.setAttribute('cx', bx.value);
+        markerB.setAttribute('cy', by.value);
+        
+        markerC.setAttribute('cx', cx.value);
+        markerC.setAttribute('cy', cy.value);
+        
+        markerD.setAttribute('cx', dx.value);
+        markerD.setAttribute('cy', dy.value);
+
+        //Build approximation====================
+        let curve = new CubicBezierCurve(
+            new Vector(parseInt(ax.value), parseInt(ay.value)),
+            new Vector(parseInt(bx.value), parseInt(by.value)),
+            new Vector(parseInt(cx.value), parseInt(cy.value)),
+            new Vector(parseInt(dx.value), parseInt(dy.value))
+        );
+
+        let approximation = curve.approximate(getAngle());
+
+        let approximatedLine = document.createElementNS(SvgNS, 'path');
+        approximatedLine.setAttribute('d', 'M' + ax.value + ',' + ay.value + 'C' + bx.value + ',' + by.value + ' ' + cx.value + ',' + cy.value + ' ' + dx.value + ',' + dy.value);
+        approximatedLine.setAttribute('fill', 'transparent');
+        approximatedLine.setAttribute('stroke', 'blue');
+        approximatedLine.setAttribute('stroke-width', '1');
+
+        if(cleanCanvasFlag.checked == true){
+            for(let i = outputCanvas.childNodes.length - 1; i >= 0 ; i--){
+                switch(outputCanvas.childNodes[i].nodeName){
+                    case "path":
+                    case "circle":
+                        outputCanvas.childNodes[i].remove();
+                }
+            }
+        }
+
+        outputCanvas.appendChild(approximatedLine);
+        for (let i = 0; i < approximation.length; i++) {
+            let marker = document.createElementNS(SvgNS, 'circle');
+            marker.setAttribute('r', '2');
+            marker.setAttribute('cx', approximation[i].x);
+            marker.setAttribute('cy', approximation[i].y);
+            outputCanvas.appendChild(marker);
+        }
+        
+        //Update valuable points=================
+        //Quarter points
+        let centerPoint = curve.getPointAt(0.5);
+        centerMarker.setAttribute('cx', centerPoint.x);
+        centerMarker.setAttribute('cy', centerPoint.y);
+
+        let quarterPoint = curve.getPointAt(0.25);
+        quarterMarker.setAttribute('cx', quarterPoint.x);
+        quarterMarker.setAttribute('cy', quarterPoint.y);
+
+        let threeQuarterPoint = curve.getPointAt(0.75);
+        threeQuarterMarker.setAttribute('cx', threeQuarterPoint.x);
+        threeQuarterMarker.setAttribute('cy', threeQuarterPoint.y);
+
+        let splitter = document.getElementById('splitter0');
+        splitter.setAttribute('d', 'M' + ax.value + ',' + ay.value + 'L' + centerPoint.x + ',' + centerPoint.y);
+        splitter = document.getElementById('splitter1');
+        splitter.setAttribute('d', 'M' + dx.value + ',' + dy.value + 'L' + centerPoint.x + ',' + centerPoint.y);
+
+        //=======================================
+        //No idea of what exactly this is supposed to calculate
+        let segmentA = curve.getControlVertex(0).subtract(curve.getStartVertex()).length();
+        let segmentB = curve.getEndVertex().subtract(curve.getControlVertex(1)).length();
+        let brokenLength = 
+            segmentA +
+            segmentB + 
+            curve.getControlVertex(1)
+                 .subtract(curve.getControlVertex(0))
+                 .length();
+        let projectionA = segmentA / brokenLength;
+        let projectionB = (brokenLength - segmentB) / brokenLength;
+        let markerPositionA = curve.getPointAt(projectionA);
+        var projectionMarker0 = document.getElementById('projectionMarker0');
+        projectionMarker0.setAttribute('cx', markerPositionA.x);
+        projectionMarker0.setAttribute('cy', markerPositionA.y);
+        var projectionMarker1 = document.getElementById('projectionMarker1');
+        let markerPositionB = curve.getPointAt(projectionB);
+        projectionMarker1.setAttribute('cx', markerPositionB.x);
+        projectionMarker1.setAttribute('cy', markerPositionB.y);
+        var approximator = document.getElementById('approximator');
+        approximator.setAttribute('d', 'M' + curve.getVertex(1).x + ',' + curve.getVertex(1).y +
+            'L' + markerPositionA.x + ',' + markerPositionA.y +
+            'L' + markerPositionB.x + ',' + markerPositionB.y +
+            'L' + curve.getVertex(0).x + ',' + curve.getVertex(0).y);
+    }
+
+    //==========================================================================================
+
+    function rebuildObject(){
+        if(approximatedObject != null){
+            approximatedObject.remove();
+        }
+
+        let processor = new CollisionSvgModelProcessor();
+        //not quite sure why I made it work this way in the past, and I can't remember now, 
+        //so let it stay this way
+        let pathContainer = { reference: object.getAttribute('d') };
+        let parsingResult = processor.processCollisionSvgModel(pathContainer, getAngle());
+        approximatedObject = document.createElementNS(SvgNS, 'path');
+        let pathData = 'M' + parsingResult[0].x + ',' + parsingResult[0].y;
+        for (let vertex = 1; vertex < parsingResult.length; vertex++) {
+            pathData += 'L' + parsingResult[vertex].x + ',' + parsingResult[vertex].y;
+        }
+        pathData += 'Z';
+        approximatedObject.setAttribute('d', pathData);
+        approximatedObject.setAttribute('fill-opacity', 0.5);
+        objectCanvas.appendChild(approximatedObject);
+    }
+
+    //==========================================================================================
+
+    function getAngle(){
+        if(angle.value=="" | angle.value <= 0) return Deg2Rad(10);
+        return Deg2Rad(angle.value);
+    }
+
+    //==========================================================================================
+
+    function onVertexMouseDown(e) {
+        e.stopPropagation();
+        document.addEventListener('mousemove', onVertexDrag);
+        document.addEventListener('mouseup', onVertexMouseUp);
+        document.listeningInteractor = e.srcElement.id;
+        document.previousPointerPosition = { x: e.clientX, y: e.clientY };
+    }
+
+    //==========================================================================================
+
+    function onVertexDrag(e) {
+        e.stopPropagation();
+        e.preventDefault();
+        let interactor = document.getElementById(document.listeningInteractor);
+        let deltaX = e.clientX - document.previousPointerPosition.x;
+        let deltaY = e.clientY - document.previousPointerPosition.y;
+        let newX = parseInt(interactor.getAttribute('cx')) + deltaX;
+        let newY = parseInt(interactor.getAttribute('cy')) + deltaY;
+        interactor.setAttribute('cx', newX);
+        interactor.setAttribute('cy', newY);
+        document.previousPointerPosition = { x: e.clientX, y: e.clientY };
+        let id;
+        switch (document.listeningInteractor) {
+            case 'markerA':
+                id = 'a';
+                break;
+            case 'markerB':
+                id = 'b';
+                break;
+            case 'markerC':
+                id = 'c';
+                break;
+            case 'markerD':
+                id = 'd'
+                break;
+        }
+        document.getElementById(id + 'x').setAttribute('value', newX);
+        document.getElementById(id + 'y').setAttribute('value', newY);
+        rebuildOutput();
+    }
+
+    //==========================================================================================
+
+    function onVertexMouseUp(e) {
+        e.stopPropagation();
+        document.removeEventListener('mousemove', onVertexDrag);
+        document.removeEventListener('mouseup', onVertexMouseUp);
+    }
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+</script>
+</html>
